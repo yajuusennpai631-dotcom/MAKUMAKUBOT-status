@@ -4,6 +4,7 @@ import time
 from datetime import datetime, timezone
 
 import httpx
+import asyncpg
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse, JSONResponse
 
@@ -15,6 +16,8 @@ CACHE_SECONDS = int(os.getenv("CACHE_SECONDS", "60"))
 app = FastAPI(title="MAKUMAKUBOT Status")
 _cache = {"at": 0.0, "data": None}
 _lock = asyncio.Lock()
+_db_pool = None
+_monitor_task = None
 
 PAGE = r"""<!doctype html>
 <html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -42,7 +45,7 @@ h1{font-size:clamp(29px,5vw,43px);letter-spacing:-.045em;color:#fff;margin:0 0 4
 .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:11px;margin:0 0 27px}.stat{padding:14px 15px;border:1px solid var(--line);background:#fff;border-radius:16px;box-shadow:0 3px 10px #b9686010}.stat span{display:block;color:var(--muted);font-size:11px}.stat b{font-size:27px;color:var(--navy);font-weight:800}
 h2{font-size:17px;color:var(--navy);margin:25px 0 10px;display:flex;align-items:center;gap:9px}h2:before{content:"";width:5px;height:18px;background:var(--coral);border-radius:8px}
 .project{border:1px solid var(--line);background:#fff;border-radius:17px;padding:16px 18px;margin:10px 0;transition:transform .2s,box-shadow .2s}.project:hover{transform:translateY(-2px);box-shadow:0 8px 20px #bd6c6016}.project-head{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:8px}.project h3{margin:0;font-size:15px;color:var(--navy)}.count{font-size:11px;color:var(--muted);background:#fff2ed;padding:3px 9px;border-radius:99px}
-.service{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:7px 14px;padding:12px 1px;border-top:1px solid #f7e9e4}.service-name{font-weight:600;overflow-wrap:anywhere;font-size:14px}.service-track{grid-column:1/-1;height:16px;border-radius:99px;background:#f4e9e6;overflow:hidden;position:relative;box-shadow:inset 0 1px 3px #26334b12}.service-fill{height:100%;width:100%;border-radius:99px;background:var(--bar);transition:background-color .35s ease;box-shadow:0 0 12px color-mix(in srgb,var(--bar) 32%,transparent)}.service-fill.deploying{background:linear-gradient(90deg,#f2bd58 0%,#ffe2a3 50%,#f2bd58 100%);background-size:200% 100%;animation:barflow 1.8s linear infinite}@keyframes barflow{to{background-position:200% 0}}.pill{white-space:nowrap;font-size:11px;font-weight:700;padding:4px 10px;border-radius:99px;background:#f2f1f2;color:#777}.pill.online{background:#e5f5ed;color:#218c67}.pill.error{background:#fde9eb;color:#c44552}.pill.deploying{background:#fff2d9;color:#9b681e}.pill.sleeping{background:#eaf1ff;color:#315fbd}
+.service{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:7px 14px;padding:12px 1px;border-top:1px solid #f7e9e4}.service-name{font-weight:600;overflow-wrap:anywhere;font-size:14px}.service-track{grid-column:1/-1;height:16px;border-radius:99px;background:#f4e9e6;overflow:hidden;position:relative;box-shadow:inset 0 1px 3px #26334b12}.service-fill{height:100%;width:100%;border-radius:99px;background:var(--bar);transition:background-color .35s ease;box-shadow:0 0 12px color-mix(in srgb,var(--bar) 32%,transparent)}.history{grid-column:1/-1;padding:2px 0 5px 2px}.history-title{font-size:10px;color:var(--muted);font-weight:700;margin-bottom:4px}.event{display:flex;gap:8px;align-items:baseline;font-size:11px;color:var(--muted);padding:2px 0}.event time{font-variant-numeric:tabular-nums;white-space:nowrap}.event b{font-weight:650;color:var(--ink)}.no-events{font-size:10px;color:#aaa}.service-fill.deploying{background:linear-gradient(90deg,#f2bd58 0%,#ffe2a3 50%,#f2bd58 100%);background-size:200% 100%;animation:barflow 1.8s linear infinite}@keyframes barflow{to{background-position:200% 0}}.pill{white-space:nowrap;font-size:11px;font-weight:700;padding:4px 10px;border-radius:99px;background:#f2f1f2;color:#777}.pill.online{background:#e5f5ed;color:#218c67}.pill.error{background:#fde9eb;color:#c44552}.pill.deploying{background:#fff2d9;color:#9b681e}.pill.sleeping{background:#eaf1ff;color:#315fbd}
 .empty,.notice{color:var(--muted);font-size:12px}.notice{border:1px solid var(--line);border-radius:12px;padding:12px;margin-top:16px;background:#fff8f4}
 footer{text-align:center;margin-top:23px;color:#fff8f2;font-size:11px;text-shadow:0 1px 6px #d95f6060}
 @media(max-width:620px){main{padding:22px 13px 40px}.hero{padding:23px 0 18px}.mascot{width:98px;height:98px}.content{padding:16px;border-radius:22px}.stats{grid-template-columns:repeat(2,1fr)}.overview{padding:15px}.project{padding:13px 14px}}
@@ -62,20 +65,20 @@ const $=id=>document.getElementById(id);
 function el(tag,cls,text){const n=document.createElement(tag);if(cls)n.className=cls;if(text!==undefined)n.textContent=text;return n}
 function statusClass(s){return s==="online"?"online":s==="error"?"error":s==="deploying"?"deploying":s==="sleeping"?"sleeping":""}
 function statusLabel(s){return ({online:"稼働中",offline:"停止中",error:"障害",deploying:"デプロイ中",sleeping:"スリープ",unknown:"不明"})[s]||"不明"}
-function render(data){
+function render(data,events=[]){
  const all=data.projects.flatMap(p=>p.services),total=all.length,online=all.filter(s=>s.state==="online").length,errors=all.filter(s=>s.state==="error").length,deploying=all.filter(s=>s.state==="deploying").length,sleeping=all.filter(s=>s.state==="sleeping").length,offline=all.filter(s=>s.state==="offline"||s.state==="unknown").length;
  $("total").textContent=total;$("online").textContent=online;$("offline").textContent=offline;$("issues").textContent=errors+deploying;
  const box=$("overall");box.className="overview"+(errors?" bad":deploying?" warn":"");
  $("headline").textContent=errors?"一部サービスで障害を検知":deploying?"デプロイが進行中":offline===total&&total?"すべてのサービスが停止中":offline?"一部サービスが停止中":"すべて正常に稼働中";
  $("summary").textContent=online+" / "+total+" サービスが稼働中"+(sleeping?" · スリープ "+sleeping:"")+(errors?" · 障害 "+errors:"");
  $("updated").textContent="最終更新："+new Date(data.updatedAt).toLocaleString("ja-JP");
- const root=$("projects");root.replaceChildren();
+ const root=$("projects");root.replaceChildren();const byService={};for(const ev of events){(byService[ev.service_id]??=[]).push(ev)}
  for(const p of data.projects){const card=el("section","project"),head=el("div","project-head"),title=el("h3","",p.name),count=el("div","count",p.services.length+" services");head.append(title,count);card.append(head);
  if(!p.services.length)card.append(el("div","empty","サービスは登録されていません。"));
- for(const s of p.services){const row=el("div","service"),name=el("div","service-name",s.name),pill=el("span","pill "+statusClass(s.state),statusLabel(s.state)),track=el("div","service-track"),fill=el("div","service-fill "+(s.state==="deploying"?"deploying":""));const bars={online:"#218c67",sleeping:"#648bd0",deploying:"#e1a83f",error:"#d94e5c",offline:"#b9b4b5",unknown:"#b9b4b5"};const color=bars[s.state]||bars.unknown;fill.style.setProperty("--bar",color);track.append(fill);row.append(name,pill,track);card.append(row)}root.append(card)}
+ for(const s of p.services){const row=el("div","service"),name=el("div","service-name",s.name),pill=el("span","pill "+statusClass(s.state),statusLabel(s.state)),track=el("div","service-track"),fill=el("div","service-fill "+(s.state==="deploying"?"deploying":""));const bars={online:"#218c67",sleeping:"#648bd0",deploying:"#e1a83f",error:"#d94e5c",offline:"#b9b4b5",unknown:"#b9b4b5"};const color=bars[s.state]||bars.unknown;fill.style.setProperty("--bar",color);track.append(fill);row.append(name,pill,track);const history=el("div","history"),historyTitle=el("div","history-title","稼働履歴");history.append(historyTitle);const logs=byService[s.id]||[];if(!logs.length)history.append(el("div","no-events","状態変化の記録はまだありません"));for(const ev of logs.slice(0,3)){const line=el("div","event"),when=el("time","",new Date(ev.created_at).toLocaleString("ja-JP")),what=el("b","",ev.message);line.append(when,what);history.append(line)}row.append(history);card.append(row)}root.append(card)}
  $("notice").hidden=!data.notice;$("notice").textContent=data.notice||"";
 }
-async function refresh(){try{const r=await fetch("/api/status",{cache:"no-store"});const data=await r.json();if(!r.ok)throw new Error(data.error||"status unavailable");render(data)}catch(e){$("headline").textContent="状態を取得できません";$("summary").textContent="しばらくしてから再読み込みしてください。";$("updated").textContent="更新に失敗"}}
+async function refresh(){try{const [r,er]=await Promise.all([fetch("/api/status",{cache:"no-store"}),fetch("/api/events",{cache:"no-store"})]);const data=await r.json(),eventData=await er.json();if(!r.ok)throw new Error(data.error||"status unavailable");render(data,eventData.events||[])}catch(e){$("headline").textContent="状態を取得できません";$("summary").textContent="しばらくしてから再読み込みしてください。";$("updated").textContent="更新に失敗"}}
 refresh();setInterval(refresh,60000);
 </script></body></html>"""
 
@@ -145,9 +148,9 @@ async def fetch_status():
                         "CRASHED": "error",
                         "THROTTLED": "error",
                     }.get(raw, "offline")
-                    return {"name": service["name"], "state": state}
+                    return {"id": service["id"], "name": service["name"], "state": state}
                 except Exception:
-                    return {"name": service["name"], "state": "unknown"}
+                    return {"id": service["id"], "name": service["name"], "state": "unknown"}
 
         output = []
         for project in projects:
@@ -159,7 +162,7 @@ async def fetch_status():
             if environment:
                 statuses = await asyncio.gather(*(service_status(project, s, environment) for s in services))
             else:
-                statuses = [{"name": s["name"], "state": "unknown"} for s in services]
+                statuses = [{"id": s["id"], "name": s["name"], "state": "unknown"} for s in services]
             output.append({"name": project["name"], "services": sorted(statuses, key=lambda s: s["name"].lower())})
 
     return {
@@ -191,6 +194,111 @@ async def status():
                 stale["notice"] = "最新情報の取得に失敗したため、直前の取得結果を表示しています。"
                 return JSONResponse(stale)
             return JSONResponse({"error": "status temporarily unavailable"}, status_code=503)
+
+
+async def persist_events(data):
+    if _db_pool is None or data.get("notice"):
+        return
+    async with _db_pool.acquire() as conn:
+        for project in data.get("projects", []):
+            for service in project.get("services", []):
+                row = await conn.fetchrow(
+                    "SELECT state FROM service_states WHERE service_id=$1",
+                    service["id"],
+                )
+                if row is None:
+                    await conn.execute(
+                        "INSERT INTO service_states(service_id, project_name, service_name, state, updated_at) VALUES($1,$2,$3,$4,NOW())",
+                        service["id"], project["name"], service["name"], service["state"],
+                    )
+                elif row["state"] != service["state"]:
+                    old, new = row["state"], service["state"]
+                    labels = {"online":"稼働中","offline":"停止中","error":"障害","deploying":"デプロイ中","sleeping":"スリープ","unknown":"状態不明"}
+                    if new == "online" and old in ("offline", "error", "unknown"):
+                        message = "復旧を検知"
+                    elif new in ("offline", "error"):
+                        message = "停止・障害を検知"
+                    else:
+                        message = labels.get(old, old) + " → " + labels.get(new, new)
+                    await conn.execute(
+                        "INSERT INTO service_events(service_id, project_name, service_name, previous_state, new_state, message) VALUES($1,$2,$3,$4,$5,$6)",
+                        service["id"], project["name"], service["name"], old, new, message,
+                    )
+                    await conn.execute(
+                        "UPDATE service_states SET project_name=$2, service_name=$3, state=$4, updated_at=NOW() WHERE service_id=$1",
+                        service["id"], project["name"], service["name"], new,
+                    )
+
+async def monitor_loop():
+    while True:
+        try:
+            result = await fetch_status()
+            await persist_events(result)
+            _cache.update(at=time.monotonic(), data=result)
+        except Exception:
+            pass
+        await asyncio.sleep(CACHE_SECONDS)
+
+@app.on_event("startup")
+async def startup():
+    global _db_pool, _monitor_task
+    database_url = os.getenv("DATABASE_URL")
+    if database_url:
+        for attempt in range(12):
+            try:
+                _db_pool = await asyncpg.create_pool(database_url, min_size=1, max_size=4, command_timeout=15)
+                async with _db_pool.acquire() as conn:
+                    await conn.execute("""
+                        CREATE TABLE IF NOT EXISTS service_states (
+                            service_id TEXT PRIMARY KEY,
+                            project_name TEXT NOT NULL,
+                            service_name TEXT NOT NULL,
+                            state TEXT NOT NULL,
+                            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                        );
+                        CREATE TABLE IF NOT EXISTS service_events (
+                            id BIGSERIAL PRIMARY KEY,
+                            service_id TEXT NOT NULL,
+                            project_name TEXT NOT NULL,
+                            service_name TEXT NOT NULL,
+                            previous_state TEXT NOT NULL,
+                            new_state TEXT NOT NULL,
+                            message TEXT NOT NULL,
+                            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                        );
+                        CREATE INDEX IF NOT EXISTS service_events_created_idx ON service_events(created_at DESC);
+                    """)
+                break
+            except Exception:
+                if _db_pool:
+                    await _db_pool.close()
+                    _db_pool = None
+                await asyncio.sleep(5)
+    _monitor_task = asyncio.create_task(monitor_loop())
+
+@app.on_event("shutdown")
+async def shutdown():
+    if _monitor_task:
+        _monitor_task.cancel()
+    if _db_pool:
+        await _db_pool.close()
+
+@app.get("/api/events")
+async def events():
+    if _db_pool is None:
+        return JSONResponse({"events": [], "notice": "履歴データベースに接続できません"})
+    async with _db_pool.acquire() as conn:
+        rows = await conn.fetch("""
+            SELECT service_id, project_name, service_name, previous_state, new_state, message, created_at
+            FROM service_events ORDER BY created_at DESC LIMIT 150
+        """)
+    return JSONResponse({"events": [
+        {"service_id": r["service_id"], "project_name": r["project_name"],
+         "service_name": r["service_name"], "previous_state": r["previous_state"],
+         "new_state": r["new_state"], "message": r["message"],
+         "created_at": r["created_at"].isoformat()}
+        for r in rows
+    ]})
 
 @app.get("/healthz")
 async def health():
