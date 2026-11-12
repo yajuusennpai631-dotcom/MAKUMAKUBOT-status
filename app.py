@@ -18,6 +18,18 @@ MAINTENANCE_MESSAGE = os.getenv("MAINTENANCE_MESSAGE", "現在メンテナンス
 MAINTENANCE_START = os.getenv("MAINTENANCE_START", "")
 MAINTENANCE_END = os.getenv("MAINTENANCE_END", "")
 
+# Volumes confirmed in the MAKUMAKUBOT production environment.
+# Usage and capacity are read from Railway's volumeInstance API.
+VOLUME_CONFIG = [
+    {"id":"eae802cd-adf9-40aa-baab-d1c38541080d","name":"makumakuportforio-volume","service":"makumakuportforio","project":"マクマクボット","size_mb":5000},
+    {"id":"aab6f7d8-7be2-4073-bdc1-b98b7f46b79c","name":"discord-bot1-volume","service":"discord-bot1","project":"マクマクボット","size_mb":5000},
+    {"id":"5693fc97-ec10-4c9a-bbb7-51472c597c4c","name":"paddleocr-cache","service":"mkmk2","project":"マクマクボット","size_mb":5000},
+    {"id":"2d4e2bf1-fe2f-4922-8e34-e0aa2e9d2929","name":"discord-bot-2-volume","service":"-2","project":"マクマクボット","size_mb":5000},
+    {"id":"7ae2fd9a-50c4-4953-98ee-77228050fc71","name":"makumakubotmini-volume","service":"MAKUMAKUBOTmini","project":"マクマクボット","size_mb":5000},
+    {"id":"0b578797-b5cc-4ae5-82fb-5e5454e2b79f","name":"aisousakubot-volume","service":"AISOUSAKUBOT","project":"マクマクボット","size_mb":5000},
+    {"id":"75cb2a69-081c-454c-b80d-0258aeba3f7a","name":"astra.2-volume","service":"ASTRA.2","project":"マクマクボット","size_mb":5000},
+]
+
 app = FastAPI(title="MAKUMAKUBOT Status")
 _cache = {"at": 0.0, "data": None}
 _lock = asyncio.Lock()
@@ -51,7 +63,7 @@ h1{font-size:clamp(29px,5vw,43px);letter-spacing:-.045em;color:#fff;margin:0 0 4
 h2{font-size:17px;color:var(--navy);margin:25px 0 10px;display:flex;align-items:center;gap:9px}h2:before{content:"";width:5px;height:18px;background:var(--coral);border-radius:8px}
 .project{border:1px solid var(--line);background:#fff;border-radius:17px;padding:16px 18px;margin:10px 0;transition:transform .2s,box-shadow .2s}.project:hover{transform:translateY(-2px);box-shadow:0 8px 20px #bd6c6016}.project-head{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:8px}.project h3{margin:0;font-size:15px;color:var(--navy)}.count{font-size:11px;color:var(--muted);background:#fff2ed;padding:3px 9px;border-radius:99px}
 .service{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:7px 14px;padding:12px 1px;border-top:1px solid #f7e9e4}.service-name{font-weight:600;overflow-wrap:anywhere;font-size:14px}.service-track{grid-column:1/-1;height:16px;border-radius:99px;background:#f4e9e6;overflow:hidden;position:relative;box-shadow:inset 0 1px 3px #26334b12}.service-fill{height:100%;width:100%;border-radius:99px;background:var(--bar);transition:background-color .35s ease;box-shadow:0 0 12px color-mix(in srgb,var(--bar) 32%,transparent)}.history{grid-column:1/-1;padding:2px 0 5px 2px}.history-title{font-size:10px;color:var(--muted);font-weight:700;margin-bottom:4px}.event{display:flex;gap:8px;align-items:baseline;font-size:11px;color:var(--muted);padding:2px 0}.event time{font-variant-numeric:tabular-nums;white-space:nowrap}.event b{font-weight:650;color:var(--ink)}.no-events{font-size:10px;color:#aaa}.service-fill.deploying{background:linear-gradient(90deg,#f2bd58 0%,#ffe2a3 50%,#f2bd58 100%);background-size:200% 100%;animation:barflow 1.8s linear infinite}@keyframes barflow{to{background-position:200% 0}}.pill{white-space:nowrap;font-size:11px;font-weight:700;padding:4px 10px;border-radius:99px;background:#f2f1f2;color:#777}.pill.online{background:#e5f5ed;color:#218c67}.pill.error{background:#fde9eb;color:#c44552}.pill.deploying{background:#fff2d9;color:#9b681e}.pill.sleeping{background:#eaf1ff;color:#315fbd}
-.empty,.notice{color:var(--muted);font-size:12px}.notice{border:1px solid var(--line);border-radius:12px;padding:12px;margin-top:16px;background:#fff8f4}.trust-panel{margin:0 0 16px;padding:13px 15px;border:1px solid #e7eaf0;border-radius:14px;background:#f8fafc;color:#566176;font-size:12px}.trust-panel b{display:block;color:var(--navy);font-size:13px;margin-bottom:4px}.trust-panel p{margin:3px 0}.incident-panel{margin:0 0 16px;padding:13px 15px;border:1px solid #f0c9c9;border-radius:14px;background:#fff5f4}.incident-panel[hidden]{display:none}.incident-panel b{display:block;color:#a63d49;font-size:13px;margin-bottom:5px}.incident-item{font-size:12px;color:#70424a;padding:3px 0}.stale-panel{display:none;margin:0 0 14px;padding:10px 13px;border-radius:12px;background:#fff1d8;border:1px solid #ebd09c;color:#805b20;font-size:12px}.stale-panel.show{display:block}.maintenance{display:none;border:1px solid #e7c77d;background:#fff5d9;color:#77551c;border-radius:14px;padding:13px 16px;margin:0 0 15px;font-size:13px}.maintenance.show{display:block}.maintenance b{display:block;font-size:14px;margin-bottom:2px}.uptime{font-size:10px;color:#69758a;display:flex;gap:10px;flex-wrap:wrap}.latency-label{font-size:10px;color:#657087;font-variant-numeric:tabular-nums}.service-track{position:relative}.service-track:after{content:attr(data-latency);position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:#24334a;text-shadow:0 1px 2px #fff9}
+.empty,.notice{color:var(--muted);font-size:12px}.notice{border:1px solid var(--line);border-radius:12px;padding:12px;margin-top:16px;background:#fff8f4}.volume-card{border:1px solid var(--line);border-radius:14px;background:#fff;padding:13px 15px;margin:9px 0}.volume-head{display:flex;justify-content:space-between;gap:10px;align-items:center;font-size:12px;font-weight:700;color:var(--navy)}.volume-meta{font-size:11px;color:var(--muted);margin:4px 0 8px}.volume-track{height:12px;border-radius:99px;background:#f1e8e5;overflow:hidden}.volume-fill{height:100%;border-radius:99px;background:#218c67;transition:width .3s}.volume-fill.warn{background:#d99a32}.volume-fill.danger{background:#d94e5c}.volume-empty{font-size:12px;color:var(--muted);padding:8px 0}.trust-panel{margin:0 0 16px;padding:13px 15px;border:1px solid #e7eaf0;border-radius:14px;background:#f8fafc;color:#566176;font-size:12px}.trust-panel b{display:block;color:var(--navy);font-size:13px;margin-bottom:4px}.trust-panel p{margin:3px 0}.incident-panel{margin:0 0 16px;padding:13px 15px;border:1px solid #f0c9c9;border-radius:14px;background:#fff5f4}.incident-panel[hidden]{display:none}.incident-panel b{display:block;color:#a63d49;font-size:13px;margin-bottom:5px}.incident-item{font-size:12px;color:#70424a;padding:3px 0}.stale-panel{display:none;margin:0 0 14px;padding:10px 13px;border-radius:12px;background:#fff1d8;border:1px solid #ebd09c;color:#805b20;font-size:12px}.stale-panel.show{display:block}.maintenance{display:none;border:1px solid #e7c77d;background:#fff5d9;color:#77551c;border-radius:14px;padding:13px 16px;margin:0 0 15px;font-size:13px}.maintenance.show{display:block}.maintenance b{display:block;font-size:14px;margin-bottom:2px}.uptime{font-size:10px;color:#69758a;display:flex;gap:10px;flex-wrap:wrap}.latency-label{font-size:10px;color:#657087;font-variant-numeric:tabular-nums}.service-track{position:relative}.service-track:after{content:attr(data-latency);position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:#24334a;text-shadow:0 1px 2px #fff9}
 footer{text-align:center;margin-top:23px;color:#fff8f2;font-size:11px;text-shadow:0 1px 6px #d95f6060}
 @media(max-width:620px){main{padding:22px 13px 40px}.hero{padding:23px 0 18px}.mascot{width:98px;height:98px}.content{padding:16px;border-radius:22px}.stats{grid-template-columns:repeat(2,1fr)}.overview{padding:15px}.project{padding:13px 14px}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition:none!important}}
@@ -63,7 +75,7 @@ footer{text-align:center;margin-top:23px;color:#fff8f2;font-size:11px;text-shado
 <section class="content">
 <div class="overview" id="overall"><i class="pulse"></i><div><strong id="headline">状態を確認中</strong><small id="summary">最新の情報を取得しています。</small></div></div>
 <div class="stats"><div class="stat"><span>総サービス数</span><b id="total">—</b></div><div class="stat"><span>稼働中</span><b id="online">—</b></div><div class="stat"><span>停止中</span><b id="offline">—</b></div><div class="stat"><span>要確認</span><b id="issues">—</b></div></div>
-<div id="stalePanel" class="stale-panel" role="status">ステータス情報の更新が遅れています。表示内容が最新ではない可能性があります。</div><div id="incidentPanel" class="incident-panel" aria-live="polite" hidden><b>現在確認されている障害・停止</b><div id="incidentList"></div></div><div id="maintenance" class="maintenance" role="status"><b>メンテナンス情報</b><span id="maintenanceText"></span></div><div class="trust-panel"><b>このページの情報について</b><p>サービス状態はRailwayのデプロイ状態をもとに確認し、公開URLがあるサービスは応答速度も計測します。</p><p>監視は約60秒間隔です。短時間の障害や監視間隔内の変化は記録されない場合があります。</p><p>稼働率はこのページで監視を開始してからの記録に基づく参考値であり、将来の稼働を保証するものではありません。</p></div><div class="legend" aria-label="ステータスの色の説明"><div class="legend-item"><i class="legend-dot" style="background:#218c67"></i>稼働中</div><div class="legend-item"><i class="legend-dot" style="background:#b9b4b5"></i>停止・不明</div><div class="legend-item"><i class="legend-dot" style="background:#d94e5c"></i>障害</div><div class="legend-item"><i class="legend-dot" style="background:#e1a83f"></i>デプロイ中</div><div class="legend-item"><i class="legend-dot" style="background:#648bd0"></i>スリープ</div></div><h2>プロジェクト別ステータス</h2><p class="section-note">バーの長さは応答速度の目安です。稼働率は監視開始後の実測範囲とともに表示します。</p><div id="projects"></div><div class="notice" id="notice" hidden></div>
+<div id="stalePanel" class="stale-panel" role="status">ステータス情報の更新が遅れています。表示内容が最新ではない可能性があります。</div><div id="incidentPanel" class="incident-panel" aria-live="polite" hidden><b>現在確認されている障害・停止</b><div id="incidentList"></div></div><div id="maintenance" class="maintenance" role="status"><b>メンテナンス情報</b><span id="maintenanceText"></span></div><div class="trust-panel"><b>このページの情報について</b><p>サービス状態はRailwayのデプロイ状態をもとに確認し、公開URLがあるサービスは応答速度も計測します。</p><p>監視は約60秒間隔です。短時間の障害や監視間隔内の変化は記録されない場合があります。</p><p>稼働率はこのページで監視を開始してからの記録に基づく参考値であり、将来の稼働を保証するものではありません。</p></div><div class="legend" aria-label="ステータスの色の説明"><div class="legend-item"><i class="legend-dot" style="background:#218c67"></i>稼働中</div><div class="legend-item"><i class="legend-dot" style="background:#b9b4b5"></i>停止・不明</div><div class="legend-item"><i class="legend-dot" style="background:#d94e5c"></i>障害</div><div class="legend-item"><i class="legend-dot" style="background:#e1a83f"></i>デプロイ中</div><div class="legend-item"><i class="legend-dot" style="background:#648bd0"></i>スリープ</div></div><h2>プロジェクト別ステータス</h2><p class="section-note">バーの長さは応答速度の目安です。稼働率は監視開始後の実測範囲とともに表示します。</p><div id="projects"></div><h2>ボリューム使用量</h2><p class="section-note">Railwayが計測する永続ボリュームの使用量です。サービス全体のディスク量とは区別して表示します。</p><div id="volumes"></div><div class="notice" id="notice" hidden></div>
 </section><footer>自動更新：60秒ごと · Powered by Railway</footer>
 </main><script>
 const $=id=>document.getElementById(id);
@@ -81,6 +93,7 @@ function render(data,events=[],uptime={}){
  for(const p of data.projects){const card=el("section","project"),head=el("div","project-head"),title=el("h3","",p.name),meta=el("div","project-meta"),count=el("div","count","全 "+p.services.length+" サービス"),active=el("div","project-status","稼働 "+p.services.filter(s=>s.state==="online").length);meta.append(count,active);head.append(title,meta);card.append(head);
  if(!p.services.length)card.append(el("div","empty","サービスは登録されていません。"));
  for(const s of p.services){const row=el("div","service"),name=el("div","service-name",s.name),pill=el("span","pill "+statusClass(s.state),statusLabel(s.state)),track=el("div","service-track"),fill=el("div","service-fill "+(s.state==="deploying"?"deploying":""));const bars={online:"#218c67",sleeping:"#648bd0",deploying:"#e1a83f",error:"#d94e5c",offline:"#b9b4b5",unknown:"#b9b4b5"};const color=bars[s.state]||bars.unknown;fill.style.setProperty("--bar",color);track.append(fill);row.append(name,pill,track);const history=el("div","history"),historyTitle=el("div","history-title","稼働率・応答速度・最近の状態変化");history.append(historyTitle);const rates=uptime[s.id]||{};const fmt=k=>rates[k]&&rates[k].percent!==null?rates[k].percent+"%（計測 "+rates[k].coverage_hours+"時間）":"計測中";history.append(el("div","uptime","稼働率 24時間 "+fmt("24h")+" ／ 7日 "+fmt("7d")+" ／ 30日 "+fmt("30d")));history.append(el("div","latency-label",s.response_ms==null?"応答速度：計測不可":"応答速度："+s.response_ms+" ms"));track.dataset.latency=s.response_ms==null?"":s.response_ms+" ms";if(s.response_ms!=null){const score=Math.max(8,Math.min(100,100-s.response_ms/20));fill.style.width=score+"%";}else{fill.style.width="100%";}const logs=byService[s.id]||[];if(!logs.length)history.append(el("div","no-events","状態変化の記録はまだありません"));for(const ev of logs.slice(0,3)){const line=el("div","event"),when=el("time","",new Date(ev.created_at).toLocaleString("ja-JP")),what=el("b","",ev.message);line.append(when,what);history.append(line)}row.append(history);card.append(row)}root.append(card)}
+ const volumeRoot=$("volumes");volumeRoot.replaceChildren();const volumeItems=data.volumes||[];if(!volumeItems.length)volumeRoot.append(el("div","volume-empty","ボリューム情報はありません"));for(const v of volumeItems){const card=el("div","volume-card"),head=el("div","volume-head"),name=el("span","",v.service+" / "+v.name),value=el("span","",v.used_mb==null?"使用量を取得できません":(v.used_mb>=1024?(v.used_mb/1024).toFixed(2)+" GB":v.used_mb.toFixed(0)+" MB")+" / "+(v.size_mb>=1024?(v.size_mb/1024).toFixed(2)+" GB":v.size_mb.toFixed(0)+" MB"));head.append(name,value);card.append(head);const meta=el("div","volume-meta",v.percent==null?"使用率：取得不可":"使用率："+v.percent+"%");card.append(meta);const track=el("div","volume-track"),fill=el("div","volume-fill"+(v.percent>=90?" danger":v.percent>=75?" warn":""));fill.style.width=(v.percent==null?0:Math.max(0,Math.min(100,v.percent)))+"%";track.append(fill);card.append(track);volumeRoot.append(card)}
  const incidents=all.filter(s=>s.state==="error"||s.state==="offline");const incidentPanel=$("incidentPanel"),incidentList=$("incidentList");incidentList.replaceChildren();incidentPanel.hidden=incidents.length===0;if(incidents.length){for(const s of incidents){const p=data.projects.find(x=>x.services.some(y=>y.id===s.id));const latest=(byService[s.id]||[])[0];const line=el("div","incident-item",(p?p.name+" / ":"")+s.name+"： "+statusLabel(s.state)+(latest?" · 検知 "+new Date(latest.created_at).toLocaleString("ja-JP"):""));incidentList.append(line)}}$("notice").hidden=!data.notice;$("notice").textContent=data.notice||"";const m=$("maintenance");m.className="maintenance"+(data.maintenance?.active?" show":"");$("maintenanceText").textContent=data.maintenance?.message||"";
 }
 async function refresh(){try{const [r,er,ur]=await Promise.all([fetch("/api/status",{cache:"no-store"}),fetch("/api/events",{cache:"no-store"}),fetch("/api/uptime",{cache:"no-store"})]);const data=await r.json(),eventData=await er.json(),ud=await ur.json();if(!r.ok)throw new Error(data.error||"status unavailable");render(data,eventData.events||[],ud.uptime||{})}catch(e){$("headline").textContent="状態を取得できません";$("summary").textContent="しばらくしてから再読み込みしてください。";$("updated").textContent="更新に失敗"}}
@@ -113,6 +126,32 @@ def maintenance_info():
         pass
     schedule=(" · 予定："+MAINTENANCE_START+" ～ "+MAINTENANCE_END) if MAINTENANCE_START or MAINTENANCE_END else ""
     return {"active": active, "message": MAINTENANCE_MESSAGE+schedule}
+
+async def fetch_volume_usage(client: httpx.AsyncClient):
+    async def one(volume):
+        try:
+            data = await gql(
+                client,
+                """query volumeUsage($volumeId: String!) {
+                  volumeInstance(id: $volumeId) { currentSizeMB sizeMB }
+                }""",
+                {"volumeId": volume["id"]},
+            )
+            instance = data.get("volumeInstance") or {}
+            used = instance.get("currentSizeMB")
+            capacity = instance.get("sizeMB") or volume["size_mb"]
+            return {
+                **volume,
+                "used_mb": round(float(used), 1) if used is not None else None,
+                "size_mb": round(float(capacity), 1) if capacity is not None else None,
+                "percent": round(float(used) / float(capacity) * 100, 1)
+                    if used is not None and capacity else None,
+            }
+        except Exception:
+            return {**volume, "used_mb": None, "size_mb": volume["size_mb"], "percent": None}
+
+    return await asyncio.gather(*(one(v) for v in VOLUME_CONFIG))
+
 
 async def fetch_status():
     if not TOKEN:
@@ -194,9 +233,12 @@ async def fetch_status():
                 statuses = [{"id": s["id"], "name": s["name"], "state": "unknown", "response_ms": None} for s in services]
             output.append({"name": project["name"], "services": sorted(statuses, key=lambda s: s["name"].lower())})
 
+    volumes = await fetch_volume_usage(client)
+
     return {
         "updatedAt": datetime.now(timezone.utc).isoformat(),
         "projects": sorted(output, key=lambda p: p["name"].lower()),
+        "volumes": volumes,
         "notice": None,
         "maintenance": maintenance_info(),
     }
