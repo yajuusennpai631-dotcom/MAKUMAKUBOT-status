@@ -63,7 +63,7 @@ footer{text-align:center;margin-top:23px;color:#fff8f2;font-size:11px;text-shado
 <section class="content">
 <div class="overview" id="overall"><i class="pulse"></i><div><strong id="headline">状態を確認中</strong><small id="summary">最新の情報を取得しています。</small></div></div>
 <div class="stats"><div class="stat"><span>総サービス数</span><b id="total">—</b></div><div class="stat"><span>稼働中</span><b id="online">—</b></div><div class="stat"><span>停止中</span><b id="offline">—</b></div><div class="stat"><span>要確認</span><b id="issues">—</b></div></div>
-<div id="maintenance" class="maintenance" role="status"><b>メンテナンス情報</b><span id="maintenanceText"></span></div><div class="legend" aria-label="ステータスの色の説明"><div class="legend-item"><i class="legend-dot" style="background:#218c67"></i>稼働中</div><div class="legend-item"><i class="legend-dot" style="background:#b9b4b5"></i>停止・不明</div><div class="legend-item"><i class="legend-dot" style="background:#d94e5c"></i>障害</div><div class="legend-item"><i class="legend-dot" style="background:#e1a83f"></i>デプロイ中</div><div class="legend-item"><i class="legend-dot" style="background:#648bd0"></i>スリープ</div></div><h2>プロジェクト別ステータス</h2><p class="section-note">各サービスの現在の状態と、直近の状態変化を確認できます。</p><div id="projects"></div><div class="notice" id="notice" hidden></div>
+<div id="maintenance" class="maintenance" role="status"><b>メンテナンス情報</b><span id="maintenanceText"></span></div><div class="legend" aria-label="ステータスの色の説明"><div class="legend-item"><i class="legend-dot" style="background:#218c67"></i>稼働中</div><div class="legend-item"><i class="legend-dot" style="background:#b9b4b5"></i>停止・不明</div><div class="legend-item"><i class="legend-dot" style="background:#d94e5c"></i>障害</div><div class="legend-item"><i class="legend-dot" style="background:#e1a83f"></i>デプロイ中</div><div class="legend-item"><i class="legend-dot" style="background:#648bd0"></i>スリープ</div></div><h2>プロジェクト別ステータス</h2><p class="section-note">バーの長さは応答速度の目安です。稼働率は監視開始後の実測範囲とともに表示します。</p><div id="projects"></div><div class="notice" id="notice" hidden></div>
 </section><footer>自動更新：60秒ごと · Powered by Railway</footer>
 </main><script>
 const $=id=>document.getElementById(id);
@@ -80,7 +80,7 @@ function render(data,events=[],uptime={}){
  const root=$("projects");root.replaceChildren();const byService={};for(const ev of events){(byService[ev.service_id]??=[]).push(ev)}
  for(const p of data.projects){const card=el("section","project"),head=el("div","project-head"),title=el("h3","",p.name),meta=el("div","project-meta"),count=el("div","count","全 "+p.services.length+" サービス"),active=el("div","project-status","稼働 "+p.services.filter(s=>s.state==="online").length);meta.append(count,active);head.append(title,meta);card.append(head);
  if(!p.services.length)card.append(el("div","empty","サービスは登録されていません。"));
- for(const s of p.services){const row=el("div","service"),name=el("div","service-name",s.name),pill=el("span","pill "+statusClass(s.state),statusLabel(s.state)),track=el("div","service-track"),fill=el("div","service-fill "+(s.state==="deploying"?"deploying":""));const bars={online:"#218c67",sleeping:"#648bd0",deploying:"#e1a83f",error:"#d94e5c",offline:"#b9b4b5",unknown:"#b9b4b5"};const color=bars[s.state]||bars.unknown;fill.style.setProperty("--bar",color);track.append(fill);row.append(name,pill,track);const history=el("div","history"),historyTitle=el("div","history-title","稼働率・応答速度・最近の状態変化");history.append(historyTitle);const rates=uptime[s.id]||{};history.append(el("div","uptime","稼働率 24時間 "+(rates["24h"]??"—")+"% ／ 7日 "+(rates["7d"]??"—")+"% ／ 30日 "+(rates["30d"]??"—")+"%"));history.append(el("div","latency-label",s.response_ms==null?"応答速度：計測不可":"応答速度："+s.response_ms+" ms"));track.dataset.latency=s.response_ms==null?"":s.response_ms+" ms";if(s.response_ms!=null){const score=Math.max(8,Math.min(100,100-s.response_ms/20));fill.style.width=score+"%";}else{fill.style.width="100%";}const logs=byService[s.id]||[];if(!logs.length)history.append(el("div","no-events","状態変化の記録はまだありません"));for(const ev of logs.slice(0,3)){const line=el("div","event"),when=el("time","",new Date(ev.created_at).toLocaleString("ja-JP")),what=el("b","",ev.message);line.append(when,what);history.append(line)}row.append(history);card.append(row)}root.append(card)}
+ for(const s of p.services){const row=el("div","service"),name=el("div","service-name",s.name),pill=el("span","pill "+statusClass(s.state),statusLabel(s.state)),track=el("div","service-track"),fill=el("div","service-fill "+(s.state==="deploying"?"deploying":""));const bars={online:"#218c67",sleeping:"#648bd0",deploying:"#e1a83f",error:"#d94e5c",offline:"#b9b4b5",unknown:"#b9b4b5"};const color=bars[s.state]||bars.unknown;fill.style.setProperty("--bar",color);track.append(fill);row.append(name,pill,track);const history=el("div","history"),historyTitle=el("div","history-title","稼働率・応答速度・最近の状態変化");history.append(historyTitle);const rates=uptime[s.id]||{};const fmt=k=>rates[k]&&rates[k].percent!==null?rates[k].percent+"%（計測 "+rates[k].coverage_hours+"時間）":"計測中";history.append(el("div","uptime","稼働率 24時間 "+fmt("24h")+" ／ 7日 "+fmt("7d")+" ／ 30日 "+fmt("30d")));history.append(el("div","latency-label",s.response_ms==null?"応答速度：計測不可":"応答速度："+s.response_ms+" ms"));track.dataset.latency=s.response_ms==null?"":s.response_ms+" ms";if(s.response_ms!=null){const score=Math.max(8,Math.min(100,100-s.response_ms/20));fill.style.width=score+"%";}else{fill.style.width="100%";}const logs=byService[s.id]||[];if(!logs.length)history.append(el("div","no-events","状態変化の記録はまだありません"));for(const ev of logs.slice(0,3)){const line=el("div","event"),when=el("time","",new Date(ev.created_at).toLocaleString("ja-JP")),what=el("b","",ev.message);line.append(when,what);history.append(line)}row.append(history);card.append(row)}root.append(card)}
  $("notice").hidden=!data.notice;$("notice").textContent=data.notice||"";const m=$("maintenance");m.className="maintenance"+(data.maintenance?.active?" show":"");$("maintenanceText").textContent=data.maintenance?.message||"";
 }
 async function refresh(){try{const [r,er,ur]=await Promise.all([fetch("/api/status",{cache:"no-store"}),fetch("/api/events",{cache:"no-store"}),fetch("/api/uptime",{cache:"no-store"})]);const data=await r.json(),eventData=await er.json(),ud=await ur.json();if(!r.ok)throw new Error(data.error||"status unavailable");render(data,eventData.events||[],ud.uptime||{})}catch(e){$("headline").textContent="状態を取得できません";$("summary").textContent="しばらくしてから再読み込みしてください。";$("updated").textContent="更新に失敗"}}
@@ -99,6 +99,20 @@ async def gql(client: httpx.AsyncClient, query: str, variables: dict | None = No
     if payload.get("errors"):
         raise RuntimeError("Railway API query failed")
     return payload.get("data") or {}
+
+def maintenance_info():
+    active=MAINTENANCE_MODE
+    now=datetime.now(timezone.utc)
+    try:
+        start=datetime.fromisoformat(MAINTENANCE_START.replace("Z","+00:00")) if MAINTENANCE_START else None
+        end=datetime.fromisoformat(MAINTENANCE_END.replace("Z","+00:00")) if MAINTENANCE_END else None
+        if start and start.tzinfo is None: start=start.replace(tzinfo=timezone.utc)
+        if end and end.tzinfo is None: end=end.replace(tzinfo=timezone.utc)
+        if start and end and start <= now <= end: active=True
+    except ValueError:
+        pass
+    schedule=(" · 予定："+MAINTENANCE_START+" ～ "+MAINTENANCE_END) if MAINTENANCE_START or MAINTENANCE_END else ""
+    return {"active": active, "message": MAINTENANCE_MESSAGE+schedule}
 
 async def fetch_status():
     if not TOKEN:
@@ -184,7 +198,7 @@ async def fetch_status():
         "updatedAt": datetime.now(timezone.utc).isoformat(),
         "projects": sorted(output, key=lambda p: p["name"].lower()),
         "notice": None,
-        "maintenance": {"active": MAINTENANCE_MODE, "message": MAINTENANCE_MESSAGE + ((" · 予定："+MAINTENANCE_START+" ～ "+MAINTENANCE_END) if MAINTENANCE_START or MAINTENANCE_END else "")},
+        "maintenance": maintenance_info(),
     }
 
 @app.get("/", response_class=HTMLResponse)
@@ -339,7 +353,7 @@ async def uptime():
                     a=max(first,sample["sampled_at"])
                     b=min(now,samples[i+1]["sampled_at"] if i+1<len(samples) else now)
                     if b>a and sample["state"]=="online": up+=(b-a).total_seconds()
-                values[key]=round(up/covered*100,2) if covered>0 else None
+                values[key]={"percent": round(up/covered*100,2) if covered>0 else None, "coverage_hours": round(covered/3600,1)}
             result[item["service_id"]]=values
     return JSONResponse({"uptime": result})
 
