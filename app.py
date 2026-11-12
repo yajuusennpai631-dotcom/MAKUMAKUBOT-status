@@ -23,7 +23,7 @@ MAINTENANCE_END = os.getenv("MAINTENANCE_END", "")
 VOLUME_CONFIG = [
     {"id":"eae802cd-adf9-40aa-baab-d1c38541080d","name":"makumakuportforio-volume","service":"makumakuportforio","project":"マクマクボット","size_mb":5000},
     {"id":"aab6f7d8-7be2-4073-bdc1-b98b7f46b79c","name":"discord-bot1-volume","service":"discord-bot1","project":"マクマクボット","size_mb":5000},
-    {"id":"5693fc97-ec10-4c9a-bbb7-51472c597c4c","name":"paddleocr-cache","service":"mkmk2","project":"マクマクボット","size_mb":5000},
+    {"id":"5693fc97-a6df-442e-a415-5426c597c4c","name":"paddleocr-cache","service":"mkmk2","project":"マクマクボット","size_mb":5000},
     {"id":"2d4e2bf1-fe2f-4922-8e34-e0aa2e9d2929","name":"discord-bot-2-volume","service":"-2","project":"マクマクボット","size_mb":5000},
     {"id":"7ae2fd9a-50c4-4953-98ee-77228050fc71","name":"makumakubotmini-volume","service":"MAKUMAKUBOTmini","project":"マクマクボット","size_mb":5000},
     {"id":"0b578797-b5cc-4ae5-82fb-5e5454e2b79f","name":"aisousakubot-volume","service":"AISOUSAKUBOT","project":"マクマクボット","size_mb":5000},
