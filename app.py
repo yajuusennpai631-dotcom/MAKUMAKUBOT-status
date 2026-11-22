@@ -503,6 +503,8 @@ async def receive_knowledge_stats(request: Request):
         body = await request.json()
     except Exception:
         return JSONResponse({"ok": False, "error": "invalid_json"}, status_code=400)
+    if not isinstance(body, dict):
+        return JSONResponse({"ok": False, "error": "invalid_payload"}, status_code=400)
     categories = body.get("categories")
     if not isinstance(categories, list) or len(categories) > 30:
         return JSONResponse({"ok": False, "error": "invalid_payload"}, status_code=400)
